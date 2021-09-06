@@ -2,6 +2,7 @@ import sqlite3
 import pyupbit
 import datetime
 import pandas as pd
+from setting import db_backtest
 from matplotlib import pyplot as plt
 
 
@@ -12,7 +13,7 @@ class BackTesterCoin:
         self.df_tsg = pd.DataFrame(columns=['ticker', 'ttsg'])
 
         self.batting = 1000000
-        self.preper = 10
+        self.preper = 25
         self.ticker = None
         self.df = None
 
@@ -44,7 +45,7 @@ class BackTesterCoin:
             self.df[['종가시가폭']] = self.df[['종가시가폭']].abs()
             self.df['돌파계수'] = self.df['종가시가폭'] / self.df['고가저가폭']
             self.df[['돌파계수']] = self.df[['돌파계수']].astype(float).round(2)
-            self.df['평균돌파계수'] = self.df['돌파계수'].rolling(window=20).mean()
+            self.df['평균돌파계수'] = self.df['돌파계수'].rolling(window=2).mean()
             self.df[['평균돌파계수']] = self.df[['평균돌파계수']].round(2)
             self.totalcount = 0
             self.totalcount_p = 0
@@ -81,7 +82,7 @@ class BackTesterCoin:
                        f" 종목출현빈도수 {onedaycount}개/일, 거래횟수 {tc}회, 평균보유기간 {avghold}일, 익절 {pc}회, "\
                        f" 손절 {mc}회, 승률 {pper}%, 평균수익률 {avgsp}%, 수익률합계 {tsp}%, 수익금합계 {format(tsg, ',')}원"
                 print(text)
-                conn = sqlite3.connect('backtest.db')
+                conn = sqlite3.connect(db_backtest)
                 self.df_back.to_sql('ticker', conn, if_exists='replace', chunksize=1000)
                 conn.close()
 
@@ -92,7 +93,7 @@ class BackTesterCoin:
             self.df_tsg = self.df_tsg.set_index('day')
             self.df_tsg['ttsg_cumsum'] = self.df_tsg['ttsg'].cumsum()
             self.df_tsg[['ttsg', 'ttsg_cumsum']] = self.df_tsg[['ttsg', 'ttsg_cumsum']].astype(int)
-            conn = sqlite3.connect('backtest.db')
+            conn = sqlite3.connect(db_backtest)
             self.df_tsg.to_sql('day', conn, if_exists='replace', chunksize=1000)
             conn.close()
             self.df_tsg.plot(figsize=(12, 9), rot=45)
@@ -100,7 +101,12 @@ class BackTesterCoin:
             plt.show()
 
     def BuyTerm(self):
-        # 전략 비공개
+        if self.df['close'][self.index] == 0:
+            return False
+        k = self.df['고가저가폭'][self.indexn - 1] * self.df['평균돌파계수'][self.indexn - 1]
+        if self.df['close'][self.indexn - 1] >= self.df['close'][self.indexn - 2] * (1 + self.preper / 100) and \
+                self.df['high'][self.index] >= self.df['open'][self.index] + k:
+            return True
         return False
 
     def Buy(self):
@@ -114,7 +120,15 @@ class BackTesterCoin:
         self.hold = True
 
     def SellTerm(self):
-        # 전략 비공개
+        k = self.df['고가저가폭'][self.indexn - 1] * self.df['평균돌파계수'][self.indexn - 1]
+        low = self.df['open'][self.index] - k
+        high = self.df['open'][self.index] + k
+        if self.df['low'][self.index] <= low:
+            self.sellprice = low
+            return True
+        if self.df['high'][self.index] <= high:
+            self.sellprice = high
+            return True
         return False
 
     def Sell(self):
