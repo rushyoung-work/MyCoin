@@ -78,19 +78,11 @@ class Worker(QThread):
             time.sleep(0.2)
             df = pyupbit.get_ohlcv(ticker)
             if df['close'][-2] >= df['close'][-3] * 1.25 or ticker in self.df_jg.index:
-                c = df['close'][-1]
-                o = df['open'][-1]
-                h = df['high'][-1]
-                low = df['low'][-1]
+                c2, c1, c = df['close'][-3:]
+                o2, o1, o = df['open'][-3:]
+                h2, h1, h = df['high'][-3:]
+                l2, l1, low = df['low'][-3:]
                 v = int(df['volume'][-1])
-                c1 = df['close'][-2]
-                o1 = df['open'][-2]
-                h1 = df['high'][-2]
-                l1 = df['low'][-2]
-                c2 = df['close'][-3]
-                o2 = df['open'][-3]
-                h2 = df['high'][-3]
-                l2 = df['low'][-3]
                 k = round((abs(c2 - o2) / (h2 - l2) + abs(c1 - o1) / (h1 - l1)) / 2, 2)
                 k = round((h1 - l1) * k, 2)
                 self.dict_gj[ticker] = [c, o, h, low, v, k]
@@ -121,6 +113,7 @@ class Worker(QThread):
                 webq.terminate()
                 self.GetVolatility()
                 webq = WebSocketManager('ticker', self.tickers)
+                self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
                 self.df_cj = pd.DataFrame(columns=columns_cj)
                 self.df_td = pd.DataFrame(columns=columns_td)
 
@@ -168,31 +161,35 @@ class Worker(QThread):
             ret = self.upbit.buy_market_order(ticker, self.dict_intg['종목당투자금'])
             self.buy_uuid = [ticker, ret[0]['uuid']]
 
-    def Sell(self, ticker, c, d, t):
+    def Sell(self, ticker, cc, d, t):
         oc = self.df_jg['보유수량'][ticker]
         if self.dict_bool['모의모드']:
-            self.UpdateSell(ticker, c, oc, d, t)
+            self.UpdateSell(ticker, cc, oc, d, t)
         else:
             ret = self.upbit.sell_market_order(ticker, oc)
             self.sell_uuid = [ticker, ret[0]['uuid']]
 
-    def UpdateBuy(self, ticker, c, oc, d, t):
-        bg = oc * c
-        pg, sg, sp = self.GetPgSgSp(bg, oc * c)
+    def UpdateBuy(self, ticker, cc, oc, d, t):
+        bg = oc * cc
+        pg, sg, sp = self.GetPgSgSp(bg, oc * cc)
         self.dict_intg['예수금'] -= bg
-        self.df_jg.at[ticker] = ticker, c, c, sp, sg, bg, pg, oc
-        self.df_cj.at[d + t] = ticker, '매수', oc, 0, c, c, t
+        self.df_jg.at[ticker] = ticker, cc, cc, sp, sg, bg, pg, oc
+        self.df_cj.at[d + t] = ticker, '매수', oc, 0, cc, cc, t
         self.data0.emit([ui_num['체결목록'], self.df_cj])
         self.log.info(f'[{now()}] 매매 시스템 체결 알림 - {ticker} {oc}코인 매수')
         self.data2.emit([0, f'매매 시스템 체결 알림 - {ticker} {oc}코인 매수'])
 
-    def UpdateSell(self, ticker, c, oc, d, t):
+        df = pd.DataFrame([[ticker, '매수', oc, 0, cc, cc, d + t]], columns=columns_cj, index=[d + t])
+        self.queryQ.put([df, 'chegeollist', 'append'])
+        self.queryQ.put([self.df_jg, 'jangolist', 'replace'])
+
+    def UpdateSell(self, ticker, cc, oc, d, t):
         bp = self.df_jg['매입가'][ticker]
-        bg = bp * c
-        pg, sg, sp = self.GetPgSgSp(bg, oc * c)
+        bg = bp * cc
+        pg, sg, sp = self.GetPgSgSp(bg, oc * cc)
         self.dict_intg['예수금'] += bg + sg
         self.df_jg.drop(index=ticker, inplace=True)
-        self.df_cj.at[d + t] = ticker, '매도', oc, 0, c, c, t
+        self.df_cj.at[d + t] = ticker, '매도', oc, 0, cc, cc, t
         self.df_td.at[d + t] = ticker, bg, pg, oc, sp, sg, t
         tsg = self.df_td['매도금액'].sum()
         tbg = self.df_td['매수금액'].sum()
@@ -207,6 +204,11 @@ class Worker(QThread):
         self.data0.emit([ui_num['거래합계'], self.df_tt])
         self.log.info(f'[{now()}] 매매 시스템 체결 알림 - {ticker} {bp}코인 매도')
         self.data2.emit([0, f'매매 시스템 체결 알림 - {ticker} {bp}코인 매도'])
+
+        df = pd.DataFrame([[ticker, '매도', oc, 0, cc, cc, d + t]], columns=columns_cj, index=[d + t])
+        self.queryQ.put([df, 'chegeollist', 'append'])
+        df = pd.DataFrame([[ticker, bp, cc, oc, sp, sg, d + t]], columns=columns_td, index=[d + t])
+        self.queryQ.put([df, 'tradelist', 'append'])
 
     # noinspection PyMethodMayBeStatic
     def GetPgSgSp(self, bg, cg):
