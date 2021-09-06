@@ -35,7 +35,6 @@ class Worker(QThread):
         self.dict_gj = {}  # key: ticker, value: list
         self.dict_intg = {
             '예수금': 0,
-            '추정예수금': 0,
             '종목당투자금': 0
         }
         self.dict_bool = {
@@ -64,12 +63,9 @@ class Worker(QThread):
     def GetBalances(self):
         if self.dict_bool['모의모드']:
             self.dict_intg['예수금'] = 100000000
-            self.dict_intg['추정예수금'] = self.dict_intg['예수금']
-            self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / 3)
         else:
             self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0]['balance']))
-            self.dict_intg['추정예수금'] = self.dict_intg['예수금']
-            self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / 3)
+        self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / 3)
 
     def GetVolatility(self):
         tickers = pyupbit.get_tickers(fiat="KRW")
@@ -99,15 +95,15 @@ class Worker(QThread):
         while True:
             data = webq.get()
             ticker = data['code']
-            prec = self.dict_gj[ticker][0]
             c = data['trade_price']
             o = data['opening_price']
             h = data['high_price']
             low = data['low_price']
             v = int(data['acc_trade_volume'])
-            k = self.dict_gj[ticker][-1]
             d = data['trade_date']
             t = data['trade_time']
+            prec = self.dict_gj[ticker][0]
+            k = self.dict_gj[ticker][-1]
 
             if d != self.str_today:
                 webq.terminate()
@@ -116,8 +112,7 @@ class Worker(QThread):
                 self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
                 self.df_cj = pd.DataFrame(columns=columns_cj)
                 self.df_td = pd.DataFrame(columns=columns_td)
-
-            if prec != c:
+            elif prec != c:
                 self.dict_gj[ticker][:5] = c, o, h, low, v
                 if c >= o + k > prec and ticker not in self.df_td.index:
                     self.Buy(ticker, c, d, t)
@@ -175,6 +170,7 @@ class Worker(QThread):
         self.dict_intg['예수금'] -= bg
         self.df_jg.at[ticker] = ticker, cc, cc, sp, sg, bg, pg, oc
         self.df_cj.at[d + t] = ticker, '매수', oc, 0, cc, cc, t
+
         self.data0.emit([ui_num['체결목록'], self.df_cj])
         self.log.info(f'[{now()}] 매매 시스템 체결 알림 - {ticker} {oc}코인 매수')
         self.data2.emit([0, f'매매 시스템 체결 알림 - {ticker} {oc}코인 매수'])
@@ -199,6 +195,7 @@ class Worker(QThread):
         sp = round(sg / tbg * 100, 2)
         tdct = len(self.df_td)
         self.df_tt = pd.DataFrame([[tdct, tbg, tsg, tsig, tssg, sp, sg]], columns=columns_tt, index=[d])
+
         self.data0.emit([ui_num['체결목록'], self.df_cj])
         self.data0.emit([ui_num['거래목록'], self.df_td])
         self.data0.emit([ui_num['거래합계'], self.df_tt])
