@@ -213,7 +213,7 @@ class Window(QtWidgets.QMainWindow):
                     if '.' not in day:
                         day = day[:4] + '.' + day[4:6] + '.' + day[6:]
                     item = QtWidgets.QTableWidgetItem(day)
-                elif column in ['종목명', '기간']:
+                elif column in ['종목명', '주문구분', '기간']:
                     item = QtWidgets.QTableWidgetItem(str(df[column][index]))
                 elif column != '수익률':
                     item = QtWidgets.QTableWidgetItem(changeFormat(df[column][index]).split('.')[0])
