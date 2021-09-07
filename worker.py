@@ -34,6 +34,7 @@ class Worker(QThread):
         self.df_tt = pd.DataFrame(columns=columns_tt)
         self.dict_gj = {}  # key: ticker, value: list
         self.dict_intg = {
+            '전일등락율': 9,
             '예수금': 0,
             '종목당투자금': 0
         }
@@ -74,7 +75,8 @@ class Worker(QThread):
         for i, ticker in enumerate(tickers):
             time.sleep(0.2)
             df = pyupbit.get_ohlcv(ticker)
-            if df['close'][-2] >= df['close'][-3] * 1.09 or ticker in self.df_jg.index:
+            if df['close'][-2] >= df['close'][-3] * (1 + self.dict_intg['전일등락율'] / 100) or \
+                    ticker in self.df_jg.index:
                 c2, c1, c = df['close'][-3:]
                 o2, o1, o = df['open'][-3:]
                 h2, h1, h = df['high'][-3:]
