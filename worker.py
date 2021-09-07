@@ -3,7 +3,7 @@ import logging
 import pyupbit
 import pandas as pd
 from PyQt5 import QtCore
-from PyQt5.QtCore import QThread, QTimer
+from PyQt5.QtCore import QThread
 from pyupbit import WebSocketManager
 from setting import *
 from static import now, timedelta_sec, strf_time
