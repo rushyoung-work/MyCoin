@@ -3,7 +3,7 @@ import logging
 import pyupbit
 import pandas as pd
 from PyQt5 import QtCore
-from PyQt5.QtCore import QThread
+from PyQt5.QtCore import QThread, QTimer
 from pyupbit import WebSocketManager
 from setting import *
 from static import now, timedelta_sec, strf_time
@@ -41,6 +41,7 @@ class Worker(QThread):
             '모의모드': True
         }
         self.dict_time = {
+            '체결확인': now(),
             '관심종목': now(),
             '거래정보': now(),
             '부가정보': now()
@@ -65,7 +66,7 @@ class Worker(QThread):
             self.dict_intg['예수금'] = 100000000
         else:
             self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0]['balance']))
-        self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / 3)
+        self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / 5)
 
     def GetVolatility(self):
         tickers = pyupbit.get_tickers(fiat="KRW")
@@ -114,27 +115,16 @@ class Worker(QThread):
                 self.df_td = pd.DataFrame(columns=columns_td)
             elif prec != c:
                 self.dict_gj[ticker][:5] = c, o, h, low, v
-                if c >= o + k > prec and ticker not in self.df_jg.index and ticker not in self.df_td.index:
+                if c >= o + k > prec and self.buy_uuid is None and \
+                        ticker not in self.df_jg.index and ticker not in self.df_td.index:
                     self.Buy(ticker, c, d, t)
-                if c <= o - k < prec and ticker in self.df_jg.index and ticker not in list(self.df_cj['종목명'].values):
+                if c <= o - k < prec and self.sell_uuid is None and \
+                        ticker in self.df_jg.index and ticker not in list(self.df_cj['종목명'].values):
                     self.Sell(ticker, c, d, t)
 
-            if not self.dict_bool['모의모드']:
-                if self.buy_uuid is not None and ticker == self.buy_uuid[0]:
-                    ret = self.upbit.get_order(self.buy_uuid[1])
-                    if ret is not None and ret['state'] == 'done':
-                        cp = ret['price']
-                        cc = ret['executed_volume']
-                        self.UpdateBuy(ticker, cp, cc, d, t)
-                        self.buy_uuid = None
-                if self.sell_uuid is not None and ticker == self.sell_uuid[0]:
-                    ret = self.upbit.get_order(self.sell_uuid[1])
-                    if ret is not None and ret['state'] == 'done':
-                        cp = ret['price']
-                        cc = ret['executed_volume']
-                        self.UpdateSell(ticker, cp, cc, d, t)
-                        self.sell_uuid = None
-
+            if not self.dict_bool['모의모드'] and now() > self.dict_time['체결확인']:
+                self.CheckChegeol(ticker, d, t)
+                self.dict_time['체결확인'] = timedelta_sec(1)
             if now() > self.dict_time['거래정보']:
                 self.UpdateTotaljango()
                 self.dict_time['거래정보'] = timedelta_sec(1)
@@ -155,6 +145,7 @@ class Worker(QThread):
         else:
             ret = self.upbit.buy_market_order(ticker, self.dict_intg['종목당투자금'])
             self.buy_uuid = [ticker, ret[0]['uuid']]
+            self.dict_time['체결확인'] = timedelta_sec(1)
 
     def Sell(self, ticker, cc, d, t):
         oc = self.df_jg['보유수량'][ticker]
@@ -163,6 +154,23 @@ class Worker(QThread):
         else:
             ret = self.upbit.sell_market_order(ticker, oc)
             self.sell_uuid = [ticker, ret[0]['uuid']]
+            self.dict_time['체결확인'] = timedelta_sec(1)
+
+    def CheckChegeol(self, ticker, d, t):
+        if self.buy_uuid is not None and ticker == self.buy_uuid[0]:
+            ret = self.upbit.get_order(self.buy_uuid[1])
+            if ret is not None and ret['state'] == 'done':
+                cp = ret['price']
+                cc = ret['executed_volume']
+                self.UpdateBuy(ticker, cp, cc, d, t)
+                self.buy_uuid = None
+        if self.sell_uuid is not None and ticker == self.sell_uuid[0]:
+            ret = self.upbit.get_order(self.sell_uuid[1])
+            if ret is not None and ret['state'] == 'done':
+                cp = ret['price']
+                cc = ret['executed_volume']
+                self.UpdateSell(ticker, cp, cc, d, t)
+                self.sell_uuid = None
 
     def UpdateBuy(self, ticker, cc, oc, d, t):
         bg = oc * cc
