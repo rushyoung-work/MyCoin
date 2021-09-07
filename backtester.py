@@ -13,10 +13,11 @@ class BackTesterCoin:
         self.df_tsg = pd.DataFrame(columns=['ticker', 'ttsg'])
 
         self.batting = 1000000
-        self.preper = 25
+        self.preper = 9
         self.ticker = None
         self.df = None
 
+        self.totalday = 0
         self.totalcount = 0
         self.totalcount_p = 0
         self.totalcount_m = 0
@@ -54,6 +55,8 @@ class BackTesterCoin:
             self.totaleyun = 0
             self.totalper = 0.
             lasth = len(self.df) - 1
+            if lasth > self.totalday:
+                self.totalday = lasth
             for h, index in enumerate(list(self.df.index)):
                 self.index = index
                 self.indexn = h
@@ -75,7 +78,8 @@ class BackTesterCoin:
                 avghold = round(df_back_['평균보유기간'].sum() / len(df_back_), 2)
                 avgsp = round(self.df_back['수익률'].sum() / tc, 2)
                 tsg = int(self.df_back['수익금'].sum())
-                onedaycount = round(tc / len(self.df_back), 2)
+                onedaycount = round(tc / self.totalday, 2)
+                onedaycount = 1 if onedaycount < 1 else onedaycount
                 onegm = int(self.batting * onedaycount * avghold)
                 tsp = round(tsg / onegm * 100, 2)
                 text = f" 종목당 배팅금액 {format(self.batting, ',')}원, 필요자금 {format(onegm, ',')}원, "\
