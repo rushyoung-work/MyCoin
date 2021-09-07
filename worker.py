@@ -36,7 +36,8 @@ class Worker(QThread):
         self.dict_intg = {
             '전일등락율': 9,
             '예수금': 0,
-            '종목당투자금': 0
+            '종목당투자금': 0,
+            '최대매수종목수': 5
         }
         self.dict_bool = {
             '모의모드': True
@@ -67,7 +68,7 @@ class Worker(QThread):
             self.dict_intg['예수금'] = 100000000
         else:
             self.dict_intg['예수금'] = int(float(self.upbit.get_balances()[0]['balance']))
-        self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / 5)
+        self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / self.dict_intg['최대매수종목수'])
 
     def GetVolatility(self):
         tickers = pyupbit.get_tickers(fiat="KRW")
