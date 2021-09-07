@@ -32,12 +32,13 @@ class Worker(QThread):
         self.df_tj = pd.DataFrame(columns=columns_tj)
         self.df_td = pd.DataFrame(columns=columns_td)
         self.df_tt = pd.DataFrame(columns=columns_tt)
-        self.dict_gj = {}  # key: ticker, value: list
+        self.dict_gj = {}       # key: ticker, value: list
         self.dict_intg = {
-            '전일등락율': 9,
             '예수금': 0,
             '종목당투자금': 0,
-            '최대매수종목수': 5
+            '전일등락율': 9,
+            '최대매수종목수': 5,
+            '업비트수수료': 0.    # 0.5% 일경우 0.005로 입력
         }
         self.dict_bool = {
             '모의모드': True
@@ -220,8 +221,8 @@ class Worker(QThread):
 
     # noinspection PyMethodMayBeStatic
     def GetPgSgSp(self, bg, cg):
-        sfee = cg * 0.0005
-        bfee = bg * 0.0005
+        sfee = cg * self.dict_intg['업비트수수료']
+        bfee = bg * self.dict_intg['업비트수수료']
         pg = int(cg - sfee - bfee)
         sg = pg - bg
         sp = round(sg / bg * 100, 2)
