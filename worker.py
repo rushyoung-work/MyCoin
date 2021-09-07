@@ -114,7 +114,7 @@ class Worker(QThread):
                 self.df_td = pd.DataFrame(columns=columns_td)
             elif prec != c:
                 self.dict_gj[ticker][:5] = c, o, h, low, v
-                if c >= o + k > prec and ticker not in self.df_td.index:
+                if c >= o + k > prec and ticker not in self.df_jg.index and ticker not in self.df_td.index:
                     self.Buy(ticker, c, d, t)
                 if c <= o - k < prec and ticker in self.df_jg.index and ticker not in list(self.df_cj['종목명'].values):
                     self.Sell(ticker, c, d, t)
@@ -169,7 +169,7 @@ class Worker(QThread):
         pg, sg, sp = self.GetPgSgSp(bg, oc * cc)
         self.dict_intg['예수금'] -= bg
         self.df_jg.at[ticker] = ticker, cc, cc, sp, sg, bg, pg, oc
-        self.df_cj.at[d + t] = ticker, '매수', oc, 0, cc, cc, t
+        self.df_cj.at[d + t] = ticker, '매수', oc, 0, cc, cc, d + t
 
         self.data0.emit([ui_num['체결목록'], self.df_cj])
         self.log.info(f'[{now()}] 매매 시스템 체결 알림 - {ticker} {oc}코인 매수')
@@ -185,8 +185,8 @@ class Worker(QThread):
         pg, sg, sp = self.GetPgSgSp(bg, oc * cc)
         self.dict_intg['예수금'] += bg + sg
         self.df_jg.drop(index=ticker, inplace=True)
-        self.df_cj.at[d + t] = ticker, '매도', oc, 0, cc, cc, t
-        self.df_td.at[d + t] = ticker, bg, pg, oc, sp, sg, t
+        self.df_cj.at[d + t] = ticker, '매도', oc, 0, cc, cc, d + t
+        self.df_td.at[d + t] = ticker, bg, pg, oc, sp, sg, d + t
         tsg = self.df_td['매도금액'].sum()
         tbg = self.df_td['매수금액'].sum()
         tsig = self.df_td[self.df_td['수익금'] > 0]['수익금'].sum()
