@@ -65,7 +65,7 @@ class BackTesterCoin:
                 elif self.hold and self.SellTerm():
                     self.Sell()
                 if self.hold and h == lasth:
-                    self.Sell()
+                    self.Sell(lastcandle=True)
             self.Report(k + 1, tcount)
 
         if len(self.df_back) > 0:
@@ -135,7 +135,9 @@ class BackTesterCoin:
             return True
         return False
 
-    def Sell(self):
+    def Sell(self, lastcandle=False):
+        if lastcandle:
+            self.sellprice = self.df['close'][self.index]
         self.hold = False
         self.CalculationEyun()
 
