@@ -73,7 +73,7 @@ class Worker(QThread):
         for i, ticker in enumerate(tickers):
             time.sleep(0.2)
             df = pyupbit.get_ohlcv(ticker)
-            if df['close'][-2] >= df['close'][-3] * 1.25 or ticker in self.df_jg.index:
+            if df['close'][-2] >= df['close'][-3] * 1.09 or ticker in self.df_jg.index:
                 c2, c1, c = df['close'][-3:]
                 o2, o1, o = df['open'][-3:]
                 h2, h1, h = df['high'][-3:]
