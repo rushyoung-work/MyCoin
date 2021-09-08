@@ -58,7 +58,7 @@ class Worker(QThread):
 
     def GetKey(self):
         """ user.txt 파일에서 업비트 access 키와 secret 키를 읽어 self.upbit 객체 생성 """
-        f = open(f'{system_path}/user.txt')
+        f = open('user.txt')
         lines = f.readlines()
         access_key = lines[0].strip()
         secret_key = lines[1].strip()

@@ -1,7 +1,7 @@
 from PyQt5.QtGui import QFont, QColor
 
-system_path = 'D:/PythonProjects/MyCoin'
-db_path = 'D:/PythonProjects/MyCoin/db'
+system_path = 'D:/PythonProjects/MyCoin/'
+db_path = f'{system_path}/db'
 db_stg = f'{db_path}/stg.db'
 db_backtest = f'{db_path}/backtest.db'
 

@@ -2,7 +2,7 @@ import sqlite3
 import pyupbit
 import datetime
 import pandas as pd
-from setting import db_backtest
+from trader.setting import db_backtest
 from matplotlib import pyplot as plt
 
 
