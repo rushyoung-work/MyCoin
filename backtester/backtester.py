@@ -1,9 +1,12 @@
+import os
+import sys
 import sqlite3
 import pyupbit
 import datetime
 import pandas as pd
-from trader.setting import db_backtest
 from matplotlib import pyplot as plt
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+from trader.setting import db_backtest
 
 
 class BackTesterCoin:
