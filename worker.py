@@ -76,7 +76,7 @@ class Worker(QThread):
     def GetVolatility(self):
         """
         전체 티커의 일봉을 조회하여 시가 및 변동성 계산, 날짜 변경 시 마다 실행된다.
-        전체 티커목록 모두를 검색하여 전날 등락율 조건을 만족한 종목과 잔고목록 종목만 관심종목으로 등록된다.
+        전날 등락율 조건을 만족한 종목과 잔고목록 종목만 관심종목으로 등록된다.
         """
         tickers = pyupbit.get_tickers(fiat="KRW")
         count = len(tickers)
