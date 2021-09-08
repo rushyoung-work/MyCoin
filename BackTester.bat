@@ -1,4 +1,4 @@
 @echo off
-cd /D D:/PythonProjects/MyCoin
-python backtester/backtester.py
+cd /D D:/PythonProjects/MyCoin/backtester
+python backtester.py
 pause

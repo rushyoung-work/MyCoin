@@ -1,2 +1,4 @@
-Access key
-Secret key
+업비트 Access key
+업비트 Secret key
+텔레그램봇 토큰
+텔레그램 사용자 아이디
