@@ -6,7 +6,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QThread
 from pyupbit import WebSocketManager
 from setting import *
-from static import now, timedelta_sec, strf_time
+from static import now, timedelta_sec, strf_time, telegram_msg
 
 
 class Worker(QThread):
@@ -120,9 +120,9 @@ class Worker(QThread):
                 """
                 날짜 변경시 실시간 데이터 수신용 웹소켓큐 제거
                 변동성 재계산
-                웹소켓큐 생성
+                웹소켓큐 재생성
                 전일실현손익 저장
-                체결목록 및 거래목록 초기화
+                체결목록, 거래목록, 실현손익 초기화
                 """
                 webq.terminate()
                 self.GetVolatility()
@@ -130,6 +130,8 @@ class Worker(QThread):
                 self.queryQ.put([self.df_tt, 'totaltradelist', 'append'])
                 self.df_cj = pd.DataFrame(columns=columns_cj)
                 self.df_td = pd.DataFrame(columns=columns_td)
+                self.df_tt = pd.DataFrame(columns=columns_tt)
+                telegram_msg('관심종목 및 거래정보를 업데이트하였습니다.')
             elif prec != c:
                 """
                 현재가가 직전 현재가와 다를 경우만 전략 연산 실행
@@ -216,6 +218,7 @@ class Worker(QThread):
         self.data0.emit([ui_num['체결목록'], self.df_cj])
         self.log.info(f'[{now()}] 매매 시스템 체결 알림 - {ticker} {oc}코인 매수')
         self.data2.emit([0, f'매매 시스템 체결 알림 - {ticker} {oc}코인 매수'])
+        telegram_msg(f'매수 알림 - {ticker} {cc} {oc}')
 
         df = pd.DataFrame([[ticker, '매수', oc, 0, cc, cc, d + t]], columns=columns_cj, index=[d + t])
         self.queryQ.put([df, 'chegeollist', 'append'])
@@ -243,6 +246,8 @@ class Worker(QThread):
         self.data0.emit([ui_num['거래합계'], self.df_tt])
         self.log.info(f'[{now()}] 매매 시스템 체결 알림 - {ticker} {bp}코인 매도')
         self.data2.emit([0, f'매매 시스템 체결 알림 - {ticker} {bp}코인 매도'])
+        telegram_msg(f'매도 알림 - {ticker} {cc} {bp}')
+        telegram_msg(f'손익 알림 - 총매수금액 {tbg}, 총매도금액{tsg}, 수익 {tsig}, 손실 {tssg}, 수익급합계 {sg}')
 
         df = pd.DataFrame([[ticker, '매도', oc, 0, cc, cc, d + t]], columns=columns_cj, index=[d + t])
         self.queryQ.put([df, 'chegeollist', 'append'])
