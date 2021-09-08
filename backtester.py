@@ -12,26 +12,29 @@ class BackTesterCoin:
         self.df_back = pd.DataFrame(columns=columns)
         self.df_tsg = pd.DataFrame(columns=['ticker', 'ttsg'])
 
-        self.batting = 1000000
-        self.preper = 9
-        self.ticker = None
-        self.df = None
+        self.batting = 1000000  # 종목당 배팅금액
+        self.preper = 9         # 전일 등락율
+        self.avg_period = 2     # 돌파계수 계산용 평균기간
+        self.fee = 0.           # 0.05%일 경우 0.0005로 설정
 
-        self.totalday = 0
-        self.totalcount = 0
-        self.totalcount_p = 0
-        self.totalcount_m = 0
-        self.totalholdday = 0
-        self.totaleyun = 0
-        self.totalper = 0.
+        self.ticker = None      # 백테스트 중인 티커명
+        self.df = None          # 백테스트 중인 데이터프레임
 
-        self.hold = False
-        self.buycount = 0
-        self.buyprice = 0
-        self.sellprice = 0
-        self.index = 0
-        self.indexb = 0
-        self.indexn = 0
+        self.totalday = 0       # 기간
+        self.totalcount = 0     # 거래 횟수 합계
+        self.totalcount_p = 0   # 익절 횟수 합계
+        self.totalcount_m = 0   # 손절 횟수 합계
+        self.totalholdday = 0   # 보유일수 합계
+        self.totaleyun = 0      # 수익금 합계
+        self.totalper = 0.      # 수익률 합계
+
+        self.hold = False       # 보유상태
+        self.buycount = 0       # 보유수량
+        self.buyprice = 0       # 매수가
+        self.sellprice = 0      # 매도가
+        self.index = 0          # 현재 인덱스값
+        self.indexn = 0         # 현재 인덱스 번호
+        self.indexb = 0         # 매수 인덱스 번호
 
         self.Start()
 
@@ -40,13 +43,13 @@ class BackTesterCoin:
         tcount = len(tickers)
         for k, ticker in enumerate(tickers):
             self.ticker = ticker
-            self.df = pyupbit.get_ohlcv(ticker, count=2000)
+            self.df = pyupbit.get_ohlcv(ticker, count=3000)
             self.df['고가저가폭'] = self.df['high'] - self.df['low']
             self.df['종가시가폭'] = self.df['close'] - self.df['open']
             self.df[['종가시가폭']] = self.df[['종가시가폭']].abs()
             self.df['돌파계수'] = self.df['종가시가폭'] / self.df['고가저가폭']
             self.df[['돌파계수']] = self.df[['돌파계수']].astype(float).round(2)
-            self.df['평균돌파계수'] = self.df['돌파계수'].rolling(window=2).mean()
+            self.df['평균돌파계수'] = self.df['돌파계수'].rolling(window=self.avg_period).mean()
             self.df[['평균돌파계수']] = self.df[['평균돌파계수']].round(2)
             self.totalcount = 0
             self.totalcount_p = 0
@@ -162,13 +165,9 @@ class BackTesterCoin:
 
     # noinspection PyMethodMayBeStatic
     def GetEyunPer(self, bg, cg):
-        gtexs = cg * 0.0023
-        gsfee = cg * 0.00015
-        gbfee = bg * 0.00015
-        texs = gtexs - (gtexs % 1)
-        sfee = gsfee - (gsfee % 10)
-        bfee = gbfee - (gbfee % 10)
-        pg = int(cg - texs - sfee - bfee)
+        sfee = cg * self.fee
+        bfee = bg * self.fee
+        pg = int(cg - sfee - bfee)
         eyun = pg - bg
         per = round(eyun / bg * 100, 2)
         return eyun, per

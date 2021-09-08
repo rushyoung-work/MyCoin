@@ -22,26 +22,26 @@ class Worker(QThread):
         self.log.addHandler(filehandler)
         self.queryQ = queryQ
 
-        self.upbit = None
-        self.tickers = None
-        self.buy_uuid = None
-        self.sell_uuid = None
-        self.str_today = None
-        self.df_cj = pd.DataFrame(columns=columns_cj)
-        self.df_jg = pd.DataFrame(columns=columns_jg)
-        self.df_tj = pd.DataFrame(columns=columns_tj)
-        self.df_td = pd.DataFrame(columns=columns_td)
-        self.df_tt = pd.DataFrame(columns=columns_tt)
-        self.dict_gj = {}       # key: ticker, value: list
+        self.upbit = None                               # 매도수 주문 및 체결 확인용
+        self.tickers = None                             # 관심종목 티커 리스트
+        self.buy_uuid = None                            # 매수 주문용
+        self.sell_uuid = None                           # 매도 주문용
+        self.str_today = None                           # 당일 날짜
+        self.df_cj = pd.DataFrame(columns=columns_cj)   # 체결목록
+        self.df_jg = pd.DataFrame(columns=columns_jg)   # 잔고목록
+        self.df_tj = pd.DataFrame(columns=columns_tj)   # 잔고평가
+        self.df_td = pd.DataFrame(columns=columns_td)   # 거래목록
+        self.df_tt = pd.DataFrame(columns=columns_tt)   # 실현손익
+        self.dict_gj = {}                               # 관심종목 key: ticker, value: list
         self.dict_intg = {
             '예수금': 0,
-            '종목당투자금': 0,
+            '종목당투자금': 0,                            # 종목당 투자금은 int(예수금 / 최대매수종목수)로 계산
             '전일등락율': 9,
             '최대매수종목수': 5,
-            '업비트수수료': 0.    # 0.5% 일경우 0.005로 입력
+            '업비트수수료': 0.                            # 0.5% 일경우 0.005로 입력
         }
         self.dict_bool = {
-            '모의모드': True
+            '모의모드': True                             # 모의모드 False 상태시만 주문 전송
         }
         self.dict_time = {
             '체결확인': now(),
@@ -57,6 +57,7 @@ class Worker(QThread):
         self.Loop()
 
     def GetKey(self):
+        """ user.txt 파일에서 업비트 access 키와 secret 키를 읽어 self.upbit 객체 생성 """
         f = open(f'{system_path}/user.txt')
         lines = f.readlines()
         access_key = lines[0].strip()
@@ -65,6 +66,7 @@ class Worker(QThread):
         self.upbit = pyupbit.Upbit(access_key, secret_key)
 
     def GetBalances(self):
+        """ 예수금 조회 및 종목당투자금 계산 """
         if self.dict_bool['모의모드']:
             self.dict_intg['예수금'] = 100000000
         else:
@@ -72,6 +74,10 @@ class Worker(QThread):
         self.dict_intg['종목당투자금'] = int(self.dict_intg['예수금'] / self.dict_intg['최대매수종목수'])
 
     def GetVolatility(self):
+        """
+        전체 티커의 일봉을 조회하여 시가 및 변동성 계산, 날짜 변경 시 마다 실행된다.
+        전체 티커목록 모두를 검색하여 전날 등락율 조건을 만족한 종목과 잔고목록 종목만 관심종목으로 등록된다.
+        """
         tickers = pyupbit.get_tickers(fiat="KRW")
         count = len(tickers)
         for i, ticker in enumerate(tickers):
@@ -111,6 +117,13 @@ class Worker(QThread):
             k = self.dict_gj[ticker][-1]
 
             if d != self.str_today:
+                """
+                날짜 변경시 실시간 데이터 수신용 웹소켓큐 제거
+                변동성 재계산
+                웹소켓큐 생성
+                전일실현손익 저장
+                체결목록 및 거래목록 초기화
+                """
                 webq.terminate()
                 self.GetVolatility()
                 webq = WebSocketManager('ticker', self.tickers)
@@ -118,6 +131,12 @@ class Worker(QThread):
                 self.df_cj = pd.DataFrame(columns=columns_cj)
                 self.df_td = pd.DataFrame(columns=columns_td)
             elif prec != c:
+                """
+                현재가가 직전 현재가와 다를 경우만 전략 연산 실행
+                매도수 로직이 유사한 형태이므로 매수 시에는 당일 거래목록에 없어야하며
+                매도 시에는 당일 체결목록에 없어야한다.
+                당일 매수한 종목을 매도하지 아니하고 당일 매도한 종목을 매수하지 않기 위함이다.
+                """
                 self.dict_gj[ticker][:5] = c, o, h, low, v
                 if c >= o + k > prec and self.buy_uuid is None and \
                         ticker not in self.df_jg.index and ticker not in self.df_td.index:
@@ -126,6 +145,10 @@ class Worker(QThread):
                         ticker in self.df_jg.index and ticker not in list(self.df_cj['종목명'].values):
                     self.Sell(ticker, c, d, t)
 
+            """
+            체결확인, 거래정보, 관심종목 정보는 1초마다 확인 및 갱신되며
+            프로세스 정보가 담긴 부가정보는 2초마다 갱신된다.
+            """
             if not self.dict_bool['모의모드'] and now() > self.dict_time['체결확인']:
                 self.CheckChegeol(ticker, d, t)
                 self.dict_time['체결확인'] = timedelta_sec(1)
@@ -138,6 +161,13 @@ class Worker(QThread):
             if now() > self.dict_time['부가정보']:
                 self.data2.emit([1, '부가정보업데이트'])
                 self.dict_time['부가정보'] = timedelta_sec(2)
+
+    """
+    모의모드 시 실제 매도수 주문을 전송하지 않고 바로 체결목록, 잔고목록 등을 갱신한다.
+    실매매 시 매도수 아이디 및 티커명을 매도, 매수 구분하여 변수에 저장하고
+    해당 변수값이 None이 아닐 경우 get_order 함수로 체결확인을 1초마다 반복실행한다.
+    체결이 완료되면 관련목록을 갱신하고 DB에 기록되며 매도수 아이디 및 티커명을 저장한 변수값이 다시 None으로 변경된다.     
+    """
 
     def Buy(self, ticker, c, d, t):
         oc = int(self.dict_intg['종목당투자금'] / c)
